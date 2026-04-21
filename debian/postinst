@@ -1,0 +1,56 @@
+#!/bin/sh
+# postinst — script (guión) que corre DESPUÉS de instalar el paquete .deb
+#
+# El sistema Debian lo ejecuta automáticamente con:
+#   dpkg --install stream-pipe_0.1.0_amd64.deb
+#
+# Peras y manzanas: es como el "asistente de instalación" que crea
+# las carpetas, los permisos y el usuario necesarios para que el
+# programa corra correctamente en el sistema.
+#
+# $1 recibe el motivo de ejecución — puede ser:
+#   "configure"  → instalación nueva o actualización
+#   "abort-*"    → rollback (reversión) de una instalación fallida
+
+set -e  # detener el script si cualquier comando falla (exit on error — salir con error)
+
+# ── [PASO 1] Crear usuario del sistema para el servicio ───────────
+# Un servicio (daemon — proceso de fondo) nunca debe correr como root
+# (administrador) por seguridad. Creamos un usuario dedicado sin
+# shell (intérprete de comandos) ni directorio home (carpeta personal).
+if ! id -u stream-pipe > /dev/null 2>&1; then
+    adduser --system --no-create-home --shell /bin/false stream-pipe
+fi
+
+# ── [PASO 2] Crear directorio de datos y configuración ────────────
+# /var/lib/ es la convención de Linux para datos persistentes de aplicaciones.
+mkdir -p /var/lib/stream-pipe
+chown stream-pipe:stream-pipe /var/lib/stream-pipe || true
+chmod 755 /var/lib/stream-pipe || true
+
+# ── [PASO 3] Crear directorio de logs (registros de eventos) ──────
+# /var/log/ es la convención de Linux para logs de aplicaciones.
+mkdir -p /var/log/stream-pipe
+chown stream-pipe:stream-pipe /var/log/stream-pipe || true
+chmod 755 /var/log/stream-pipe || true
+
+# ── [PASO 4] Ajustar permisos del config.toml si ya existe ────────
+# En una actualización (upgrade — mejora de versión) el config.toml
+# ya existe con datos del usuario — no lo pisamos, solo ajustamos permisos.
+if [ -f /var/lib/stream-pipe/config.toml ]; then
+    chown stream-pipe:stream-pipe /var/lib/stream-pipe/config.toml || true
+    # 664 = dueño y grupo pueden leer/escribir, otros solo leer
+    chmod 664 /var/lib/stream-pipe/config.toml || true
+fi
+
+# ── [PASO 5] Recargar systemd para reconocer el nuevo servicio ────
+# daemon-reload (recargar el daemon — proceso de fondo) lee los archivos
+# .service nuevos o actualizados. Sin esto, systemctl no sabe que
+# existe el servicio stream-pipe.
+if [ "$1" = "configure" ]; then
+    systemctl daemon-reload || true
+fi
+
+#DEBHELPER#
+
+exit 0

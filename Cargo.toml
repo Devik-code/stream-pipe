@@ -1,0 +1,153 @@
+[package]
+name    = "stream-pipe"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"   # licencia del proyecto — MIT es la más permisiva y común en Rust
+
+# ─────────────────────────────────────────────────────────────────
+# DEPENDENCIAS (librerías externas que usa el proyecto)
+# ─────────────────────────────────────────────────────────────────
+[dependencies]
+# reqwest: cliente HTTP (protocolo de transferencia web) con soporte de streaming (flujo de datos)
+reqwest     = { version = "0.12", features = ["stream"] }
+
+# tokio: runtime (entorno de ejecución) async (asíncrono) para Rust
+tokio       = { version = "1", features = ["full"] }
+
+# bytes: tipo Bytes eficiente para manejo de buffers (memorias intermedias) — zero-copy (sin copias)
+bytes       = "1"
+
+# thiserror: macro (generador de código) para definir tipos de error propios sin boilerplate (código repetitivo)
+thiserror   = "2"
+
+# futures-util: utilidades para trabajar con streams (flujos) y futures (valores futuros)
+futures-util = "0.3"
+
+# serde: framework (estructura base) de serialización/deserialización
+# (serializar = convertir struct — estructura de datos — a texto/bytes para guardar o enviar,
+#  deserializar = convertir texto/bytes de vuelta a struct)
+# features = ["derive"] activa los macros #[derive(Serialize, Deserialize)]
+serde = { version = "1", features = ["derive"] }
+
+# config: lee archivos de configuración en múltiples formatos (TOML, JSON, YAML, etc.)
+# Peras y manzanas: es el "lector de config.toml" del programa
+config = "0.15"
+
+# tracing: sistema de logging (registro de eventos) estructurado para Rust
+# Reemplaza println! con mensajes que tienen nivel (info, warn, error, debug),
+# timestamp (marca de tiempo — cuándo ocurrió) y contexto adicional
+tracing = "0.1"
+
+# tracing-subscriber: conecta tracing con destinos de salida (pantalla, archivos)
+# EnvFilter permite controlar el nivel de log con la variable de entorno RUST_LOG
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# tracing-appender: escribe logs (registros) a archivos con rotación (rotation —
+# crear un archivo nuevo cada día/hora/tamaño para no llenar el disco)
+tracing-appender = "0.2"
+
+
+# ─────────────────────────────────────────────────────────────────
+# DEV-DEPENDENCIES (dependencias solo para tests y benchmarks — no van al binario final)
+# ─────────────────────────────────────────────────────────────────
+[dev-dependencies]
+# wiremock: servidor HTTP falso (mock — simulacro) para tests sin red real
+# Permite simular respuestas con latencia, errores 404, cuerpos arbitrarios, etc.
+wiremock = "0.6"
+
+# proptest: property-based testing (pruebas basadas en propiedades)
+# Genera combinaciones aleatorias de inputs para encontrar edge cases (casos límite)
+# que los tests manuales no cubrirían nunca
+proptest = "1"
+
+# criterion: framework de benchmarking (medición de rendimiento) estadístico
+# Mide tiempo de ejecución con rigor estadístico: media, percentil 99, regresiones
+# async_tokio = soporte para benchmarks de funciones async (asíncronas)
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+# ─────────────────────────────────────────────────────────────────
+# BENCHMARKS (mediciones de rendimiento)
+# ─────────────────────────────────────────────────────────────────
+[[bench]]
+name    = "pipeline_bench"  # corresponde al archivo benches/pipeline_bench.rs
+harness = false             # false = usar criterion en vez del harness (arnés) por defecto de Rust
+
+# ─────────────────────────────────────────────────────────────────
+# EMPAQUETADO DEBIAN (formato de paquete para Linux Ubuntu/Debian)
+# Requiere: cargo install cargo-deb
+# Uso:      cargo deb
+# Genera:   target/debian/stream-pipe_0.1.0_amd64.deb
+# ─────────────────────────────────────────────────────────────────
+[package.metadata.deb]
+maintainer = "Victor Riquelme <>"
+copyright  = "2026, Victor Riquelme <>"
+depends    = ""                          # sin dependencias externas — binario (ejecutable) estático
+assets = [
+    # [origen en el proyecto,            destino en el sistema Linux,    permisos (rwx)]
+    ["target/release/stream-pipe",       "usr/bin/",                     "755"],  # ejecutable principal
+    ["debian/service",                   "lib/systemd/system/stream-pipe.service", "644"],  # servicio systemd (gestor de servicios de Linux)
+    ["config.toml",                      "var/lib/stream-pipe/",         "664"],  # archivo de configuración
+]
+maintainer-scripts = "debian/"           # scripts pre/post instalación
+systemd-units = { enable = true, start = true }  # habilitar e iniciar el servicio automáticamente
+
+
+# ─────────────────────────────────────────────────────────────────
+# COMPILACIÓN CRUZADA (cross-compilation)
+#
+# ¿Qué es compilación cruzada? — peras y manzanas:
+#   Normalmente compilás en tu PC con Linux y el ejecutable (binario)
+#   solo corre en Linux. Compilación cruzada es como cocinar en
+#   tu cocina (Linux x86_64) pero preparar comida para otra persona
+#   que tiene una cocina diferente (Windows, ARM, Mac).
+#   El resultado final corre en la máquina destino, no en la tuya.
+#
+# Herramienta: `cross` (wrapper — envoltorio de cargo que usa Docker
+#              para tener el compilador correcto para cada plataforma)
+#
+# Instalación:
+#   cargo install cross
+#   (requiere Docker corriendo en tu máquina)
+#
+# Uso para compilar para cada plataforma (SO — sistema operativo):
+#   cross build --release --target x86_64-pc-windows-gnu        # Windows 64-bit
+#   cross build --release --target aarch64-unknown-linux-gnu    # Linux ARM 64-bit (Raspberry Pi 4, servidores ARM)
+#   cross build --release --target arm-unknown-linux-gnueabihf  # Linux ARM 32-bit (Raspberry Pi 2/3)
+#   cross build --release --target x86_64-unknown-linux-musl    # Linux 64-bit estático (sin dependencias de sistema)
+#
+# Los ejecutables (binarios) quedan en:
+#   target/<nombre-del-target>/release/stream-pipe
+#   target/<nombre-del-target>/release/stream-pipe.exe  (Windows)
+# ─────────────────────────────────────────────────────────────────
+
+# ── TARGET: Windows 64-bit ────────────────────────────────────────
+# Genera un .exe que corre en cualquier Windows de 64 bits (x86_64).
+# GNU (GNU's Not Unix) = toolchain (cadena de herramientas) de compilación libre,
+# alternativa a MSVC (Microsoft Visual C++ — compilador oficial de Microsoft).
+[package.metadata.cross.target.x86_64-pc-windows-gnu]
+image = "ghcr.io/cross-rs/x86_64-pc-windows-gnu:0.2.4"
+
+# ── TARGET: Linux ARM 64-bit ──────────────────────────────────────
+# Para servidores ARM modernos, Raspberry Pi 4/5, Apple M1/M2 con Linux,
+# y la mayoría de dispositivos embebidos (embedded — integrados) modernos.
+# aarch64 = arquitectura de 64 bits de ARM (Advanced RISC Machine —
+#            Máquina con Conjunto Reducido de Instrucciones Avanzado).
+[package.metadata.cross.target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:0.2.4"
+
+# ── TARGET: Linux ARM 32-bit ──────────────────────────────────────
+# Para Raspberry Pi 2 y 3, dispositivos IoT (Internet of Things —
+# Internet de las Cosas) y hardware embebido (integrado) más viejo.
+# gnueabihf = ABI (Application Binary Interface — interfaz binaria
+#             de aplicación) hard-float (punto flotante por hardware).
+[package.metadata.cross.target.arm-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/arm-unknown-linux-gnueabihf:0.2.4"
+
+# ── TARGET: Linux 64-bit estático (musl) ──────────────────────────
+# musl (pronunciado "muscle") es una implementación alternativa de libc
+# (biblioteca estándar de C — base de casi todo programa en Linux).
+# Un binario (ejecutable) compilado con musl no depende de ninguna
+# librería del sistema operativo destino — corre en CUALQUIER Linux
+# sin instalar nada. Ideal para contenedores Docker (entornos aislados).
+[package.metadata.cross.target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:0.2.4"

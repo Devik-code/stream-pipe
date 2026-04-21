@@ -1,0 +1,20 @@
+# .cargo/config.toml — configuración local del proyecto para Cargo
+#
+# Este archivo le dice a Cargo (el gestor de paquetes y compilador de Rust)
+# cómo comportarse en situaciones especiales, como la compilación cruzada
+# (cross-compilation — compilar para otro sistema operativo desde Linux).
+
+# ── TARGET: Windows 64-bit con GNU toolchain ──────────────────────────────────
+#
+# Problema: Rust 1.87+ usa GetHostNameW (función de red de Windows — parte de
+# la biblioteca Ws2_32 — Windows Sockets 2 — que maneja conexiones de red).
+# El linker (enlazador — programa que une piezas compiladas en un ejecutable)
+# GNU no la enlaza automáticamente en compilación cruzada.
+#
+# Solución: indicarle explícitamente al linker que incluya ws2_32.
+#
+# rustflags (flags de rustc — opciones que se pasan al compilador de Rust):
+#   -C link-arg=... = pasar un argumento directo al linker
+#   -lws2_32        = "link with ws2_32" (enlazar con la biblioteca ws2_32)
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "link-arg=-lws2_32"]

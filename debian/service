@@ -1,0 +1,35 @@
+# service — unidad de systemd (gestor de servicios de Linux) para stream-pipe
+#
+# cargo-deb (empaquetador Debian) detecta este archivo automáticamente
+# porque se llama `service` — no hace falta el nombre largo stream-pipe.service.
+#
+# Comandos útiles una vez instalado el paquete .deb:
+#   systemctl start   stream-pipe   # arrancar
+#   systemctl stop    stream-pipe   # detener
+#   systemctl status  stream-pipe   # ver estado y logs (registros)
+#   journalctl -u     stream-pipe   # ver historial de logs
+
+[Unit]
+Description=stream-pipe — pipeline (tubería) de procesamiento de video
+# Requiere red activa antes de arrancar (descarga video de internet)
+After=network.target
+
+[Service]
+Type=simple
+# Usuario sin privilegios (no root — no administrador) por seguridad
+User=stream-pipe
+# Directorio donde vive el config.toml (archivo de configuración)
+WorkingDirectory=/var/lib/stream-pipe
+# Binario (ejecutable) principal del servicio
+ExecStart=/usr/bin/stream-pipe
+# Reiniciar si el proceso colapsa inesperadamente
+Restart=on-failure
+RestartSec=5
+# Redirigir stdout (salida estándar) y stderr (salida de errores) al journal
+# (registro centralizado de Linux, consultable con journalctl)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+# Activar en multi-user.target (modo servidor — sin interfaz gráfica)
+WantedBy=multi-user.target

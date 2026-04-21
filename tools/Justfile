@@ -1,0 +1,194 @@
+# ═══════════════════════════════════════════════════════════════
+# Justfile — automatizador de tareas del proyecto stream-pipe
+#
+# Peras y manzanas:
+#   just es como un menú de accesos directos para la terminal.
+#   En vez de recordar y tipear comandos largos como:
+#     cargo build --release --target x86_64-pc-windows-gnu
+#   simplemente escribís:
+#     just -f tools/Justfile build-windows
+#
+# Instalación de just (si no lo tenés):
+#   cargo install just
+#
+# Uso (desde la raíz del proyecto):
+#   just -f tools/Justfile <nombre-del-comando>
+#   just -f tools/Justfile          ← muestra todos los comandos disponibles
+#
+# Nota sobre rutas (paths — direcciones de archivos):
+#   Este Justfile vive en tools/ pero los comandos de cargo (compilador/gestor
+#   de paquetes de Rust) necesitan el Cargo.toml que está en la raíz (../).
+#   Por eso usamos --manifest-path ../Cargo.toml donde hace falta.
+# ═══════════════════════════════════════════════════════════════
+
+# set shell = ["bash", "-c"] le dice a just qué intérprete de comandos usar.
+# bash (Bourne Again Shell — intérprete de comandos de Linux) es el estándar en Linux.
+set shell := ["bash", "-c"]
+
+# ─────────────────────────────────────────────────────────────────
+# VARIABLES (valores reutilizables en múltiples comandos)
+# ─────────────────────────────────────────────────────────────────
+
+# manifest = ruta (path — dirección) al Cargo.toml principal del proyecto
+manifest := "--manifest-path ../Cargo.toml"
+
+# release_flags = flags (opciones) para compilar en modo release (producción —
+# optimizado para velocidad, sin información de depuración — debugging).
+# En modo debug (depuración — por defecto) el binario — ejecutable — es más lento
+# pero tiene información para encontrar errores. Release es para el usuario final.
+release_flags := "--release"
+
+
+# ─────────────────────────────────────────────────────────────────
+# CI (Continuous Integration — Integración Continua):
+# checks (verificaciones) que corren en el servidor antes de mergear código.
+# Peras y manzanas: es la lista de controles de calidad que hace el jefe
+# antes de aprobar tu trabajo.
+# ─────────────────────────────────────────────────────────────────
+
+# ci corre TODOS los checks de calidad en secuencia.
+# Si uno falla, para ahí y no sigue.
+ci: fmt check clippy test deny audit
+
+# fmt (format — formatear): verifica que el código tenga el estilo correcto.
+# cargo fmt es el formateador oficial de Rust — como un corrector ortográfico
+# pero para el estilo del código (indentación — sangría, espacios, etc).
+# --check = solo verificar, no modificar archivos (para CI — servidor de integración)
+fmt:
+    cargo fmt {{manifest}} --all -- --check
+
+# check: verifica que el código compila sin errores, sin generar el ejecutable.
+# Es más rápido que build (compilar completo) — útil para detectar errores rápido.
+# --all-targets = verificar binarios (ejecutables), tests (pruebas), ejemplos, etc.
+# --all-features = activar todas las features (características opcionales) del proyecto
+check:
+    cargo check {{manifest}} --all-targets --all-features
+
+# clippy: el linter (analizador de código) de Rust.
+# Clippy encuentra errores comunes, código ineficiente y malas prácticas.
+# Peras y manzanas: es como un colega experimentado que revisa tu código
+# y te dice "esto se puede escribir mejor así".
+# -D warnings = tratar warnings (advertencias) como errors (errores) — sin excepciones
+clippy:
+    cargo clippy {{manifest}} --all-targets --all-features -- -D warnings
+
+# test: corre los tests (pruebas automatizadas) del proyecto.
+# Tests son funciones especiales que verifican que el código funciona correctamente.
+# Peras y manzanas: es como el control de calidad que prueba cada pieza
+# antes de armarla en el producto final.
+test:
+    cargo test {{manifest}} --all-features
+
+# deny: verifica las licencias (permisos de uso) y vulnerabilidades (fallas de seguridad)
+# de las dependencias (librerías externas — código de terceros que usamos).
+# Requiere: cargo install cargo-deny
+deny:
+    cargo deny {{manifest}} check
+
+# audit: busca vulnerabilidades (fallas de seguridad conocidas) en las dependencias.
+# Consulta la base de datos RustSec (base de datos de seguridad de Rust).
+# Requiere: cargo install cargo-audit
+audit:
+    cargo audit --file ../Cargo.lock
+
+
+# ─────────────────────────────────────────────────────────────────
+# BUILD (compilación — convertir código fuente en ejecutable)
+# ─────────────────────────────────────────────────────────────────
+
+# build-debug: compila en modo debug (depuración — con información de errores).
+# Más lento de ejecutar pero compila rápido. Ideal mientras desarrollás.
+# El ejecutable (binario) queda en: target/debug/stream-pipe
+build-debug:
+    cargo build {{manifest}}
+
+# build-release: compila en modo release (producción — optimizado).
+# Tarda más en compilar pero el ejecutable es mucho más rápido.
+# El ejecutable (binario) queda en: target/release/stream-pipe
+build-release:
+    cargo build {{manifest}} {{release_flags}}
+
+# run: compila y ejecuta el programa en modo debug (depuración).
+# Equivale a build-debug + ejecutar el binario resultante.
+run:
+    cargo run {{manifest}}
+
+# run-release: compila y ejecuta en modo release (producción — optimizado).
+run-release:
+    cargo run {{manifest}} {{release_flags}}
+
+
+# ─────────────────────────────────────────────────────────────────
+# CROSS-COMPILATION (compilación cruzada — compilar para otro sistema operativo)
+#
+# Peras y manzanas:
+#   Cocinás en tu cocina (Linux x86_64) pero la comida es para otra persona
+#   con una cocina diferente (Windows, ARM, etc).
+#   El ejecutable resultante corre en la máquina destino, no en la tuya.
+#
+# Requiere:
+#   cargo install cross
+#   Docker (entorno de contenedores) corriendo en tu máquina
+#
+# Los ejecutables quedan en: target/<target>/release/stream-pipe(.exe)
+# ─────────────────────────────────────────────────────────────────
+
+# build-windows: compila para Windows 64-bit (x86_64).
+# Genera un archivo .exe que corre en cualquier Windows moderno de 64 bits.
+# x86_64 = arquitectura (diseño de procesador) Intel/AMD de 64 bits
+# pc-windows-gnu = plataforma Windows usando toolchain (cadena de herramientas) GNU
+#                  (alternativa libre al compilador oficial de Microsoft MSVC)
+build-windows:
+    cross build {{manifest}} {{release_flags}} --target x86_64-pc-windows-gnu
+
+# build-linux-arm64: compila para Linux ARM 64-bit.
+# Para: Raspberry Pi 4/5, servidores cloud (nube) ARM, Apple M1/M2 con Linux.
+# aarch64 = arquitectura ARM de 64 bits (la más moderna y común hoy)
+# unknown = sin vendor (fabricante) específico
+# linux-gnu = sistema operativo Linux con librería estándar GNU
+build-linux-arm64:
+    cross build {{manifest}} {{release_flags}} --target aarch64-unknown-linux-gnu
+
+# build-linux-arm32: compila para Linux ARM 32-bit.
+# Para: Raspberry Pi 2/3, dispositivos IoT (Internet of Things — Internet de las Cosas),
+# hardware embebido (integrado en un dispositivo) más antiguo.
+# arm = arquitectura ARM de 32 bits
+# gnueabihf = GNU con ABI (Application Binary Interface — interfaz binaria de aplicación)
+#             hard-float (punto flotante por hardware — más rápido que por software)
+build-linux-arm32:
+    cross build {{manifest}} {{release_flags}} --target arm-unknown-linux-gnueabihf
+
+# build-linux-musl: compila para Linux con musl (librería estándar alternativa).
+# El ejecutable resultante es completamente estático (no depende de ninguna
+# librería del sistema operativo destino) — corre en CUALQUIER Linux sin instalar nada.
+# Ideal para contenedores Docker (entornos aislados y portables).
+build-linux-musl:
+    cross build {{manifest}} {{release_flags}} --target x86_64-unknown-linux-musl
+
+# build-all: compila para TODAS las plataformas de una vez.
+# Útil antes de un release (lanzamiento de nueva versión) para verificar
+# que el código compila en todos los destinos soportados.
+build-all: build-windows build-linux-arm64 build-linux-arm32 build-linux-musl
+
+
+# ─────────────────────────────────────────────────────────────────
+# PACKAGING (empaquetado — crear instaladores para cada plataforma)
+# ─────────────────────────────────────────────────────────────────
+
+# package-deb: genera un paquete .deb (formato de instalador de Debian/Ubuntu).
+# El .deb incluye el ejecutable, el servicio systemd y el config.toml.
+# Requiere: cargo install cargo-deb
+# El paquete queda en: target/debian/stream-pipe_0.1.0_amd64.deb
+package-deb: build-release
+    cargo deb {{manifest}}
+
+
+# ─────────────────────────────────────────────────────────────────
+# LIMPIEZA (cleanup — borrar archivos generados por la compilación)
+# ─────────────────────────────────────────────────────────────────
+
+# clean: borra la carpeta target/ con todos los binarios (ejecutables) compilados.
+# Útil cuando querés una compilación fresca o para liberar espacio en disco.
+# Peras y manzanas: es como barrer el piso de la fábrica — empezás de cero.
+clean:
+    cargo clean {{manifest}}

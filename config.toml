@@ -1,0 +1,33 @@
+# config.toml — configuración del programa stream-pipe
+#
+# TOML (Tom's Obvious Minimal Language — Lenguaje Mínimo y Obvio de Tom)
+# es un formato de configuración legible, similar a un archivo .ini pero
+# con tipos de datos (strings — cadenas de texto, números, booleanos, etc).
+
+# ─────────────────────────────────────────────────────────────────
+[video]
+# url: dirección web del video a descargar y procesar
+# Para pruebas rápidas (~2.75 MB): ForBiggerBlazes.mp4
+# Para prueba completa (~158 MB):  BigBuckBunny.mp4
+url = "https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4"
+
+# frame_size: tamaño de cada frame (cuadro) simulado en bytes
+# 65536 = 64 KB (kilobytes) — valor recomendado para streaming
+frame_size = 65536
+
+# ─────────────────────────────────────────────────────────────────
+[pipeline]
+# workers: cantidad de consumidores (hilos — threads procesando frames)
+# 1 = un solo consumidor (configuración actual)
+workers = 1
+
+# ─────────────────────────────────────────────────────────────────
+[logging]
+# level: nivel de detalle de los logs (registros de eventos)
+# opciones: "error", "warn", "info", "debug", "trace"
+level = "info"
+
+# log_dir: carpeta donde se guardan los archivos de log (registro)
+# En desarrollo usamos la carpeta local "logs/"
+# En producción (servidor instalado): "/var/log/stream-pipe"
+log_dir = "logs"

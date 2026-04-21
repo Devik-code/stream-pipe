@@ -1,0 +1,18 @@
+# Cross.toml — configuración para la herramienta `cross`
+#
+# cross (compilación cruzada basada en Docker — entorno aislado con
+# el toolchain — cadena de herramientas completa para cada plataforma).
+#
+# Este archivo define qué imagen Docker usar para cada target
+# (plataforma destino — sistema operativo y arquitectura de destino).
+#
+# IMPORTANTE: Cross.toml tiene PRIORIDAD sobre [package.metadata.cross]
+# en Cargo.toml. Si ambos existen, este gana.
+
+# ── TARGET: Windows 64-bit ────────────────────────────────────────────────────
+[target.x86_64-pc-windows-gnu]
+# Usamos :main (rama principal — versión más reciente de la imagen)
+# en vez de :0.2.4 porque Rust 1.87+ agregó GetHostNameW a libstd
+# y la imagen 0.2.4 no incluye el fix de linkeo para ws2_32
+# (Windows Sockets 2 — biblioteca de red de Windows).
+image = "ghcr.io/cross-rs/x86_64-pc-windows-gnu:main"
